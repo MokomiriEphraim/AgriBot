@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { saveDeviceMessage } from "@/lib/mongodb"
 
 export const runtime = "nodejs"
+export const maxDuration = 60
 
 const GROUNDBREAKING_AGRONOMY_PROMPT = `You are AgriBot — an elite, world-class Agronomist, Plant Pathologist, and Precision Agriculture AI.
 

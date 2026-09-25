@@ -4,6 +4,7 @@ import { matchKB, getRegionNote } from "@/lib/knowledge-base"
 import type { Region } from "@/lib/types"
 
 export const runtime = "nodejs"
+export const maxDuration = 60
 
 const DIAGNOSIS_PROMPT = `You are AgriBot, a friendly farming helper for small farmers.
 

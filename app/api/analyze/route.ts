@@ -2,6 +2,7 @@ import OpenAI from "openai"
 import { NextResponse } from "next/server"
 
 export const runtime = "nodejs"
+export const maxDuration = 60
 
 const ANALYSIS_PROMPT = `Describe this plant photo. Be brief — identify the plant and what looks wrong.
 Reply as JSON only, no markdown:

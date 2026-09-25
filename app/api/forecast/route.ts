@@ -4,6 +4,7 @@ import { getDatabase } from "@/lib/mongodb"
 import { checkRateLimit, recordUsage } from "@/lib/rate-limit"
 
 export const runtime = "nodejs"
+export const maxDuration = 60
 
 // Curated fallback stock images
 const FALLBACK_IMAGES = {
