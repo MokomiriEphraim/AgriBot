@@ -26,6 +26,53 @@ const nextId = () => `m${idCounter++}`
 const now = () =>
   new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
 
+function hasCropContext(messages: Message[], currentMsg?: Message): boolean {
+  // If an image was uploaded anywhere in the conversation
+  if (messages.some((m) => Boolean(m.image))) return true
+
+  const textToCheck = currentMsg?.text || messages.map((m) => m.text || "").join(" ")
+  const lower = textToCheck.toLowerCase()
+
+  // Exclude simple greetings and generic intro text
+  if (
+    lower.includes("welcome to agribot") ||
+    lower.includes("how can i assist your farm") ||
+    lower.startsWith("👋")
+  ) {
+    return false
+  }
+
+  const cropKeywords = [
+    "plant species",
+    "health assessment",
+    "visual health",
+    "action steps",
+    "treatment plan",
+    "blight",
+    "mildew",
+    "chlorosis",
+    "infestation",
+    "aphid",
+    "pathogen",
+    "caterpillar",
+    "fungal",
+    "bacterial",
+    "deficiency",
+    "wilt",
+    "rot",
+    "rust",
+    "protea",
+    "tomato",
+    "maize",
+    "corn",
+    "pepper",
+    "potato",
+    "cassava",
+  ]
+
+  return cropKeywords.some((k) => lower.includes(k))
+}
+
 export function AgriBotChat({ onBack }: { onBack?: () => void }) {
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(false)
@@ -249,14 +296,16 @@ export function AgriBotChat({ onBack }: { onBack?: () => void }) {
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   Conversation
                 </span>
-                <button
-                  type="button"
-                  onClick={() => triggerForecast()}
-                  className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20 transition-all"
-                >
-                  <Sparkles className="size-2.5 text-emerald-600" />
-                  Predict 14-Day
-                </button>
+                {hasCropContext(messages) && (
+                  <button
+                    type="button"
+                    onClick={() => triggerForecast()}
+                    className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20 transition-all"
+                  >
+                    <Sparkles className="size-2.5 text-emerald-600" />
+                    Predict 14-Day
+                  </button>
+                )}
               </div>
               <button
                 type="button"
@@ -290,19 +339,22 @@ export function AgriBotChat({ onBack }: { onBack?: () => void }) {
                   </div>
                 )}
 
-                {/* 1-Click Prognosis Trigger on Bot messages without progression */}
-                {m.role === "bot" && !m.progression && m.text && m.text.length > 50 && (
-                  <div className="flex pl-1">
-                    <button
-                      type="button"
-                      onClick={() => triggerForecast()}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/5 px-3 py-1 text-[11px] font-semibold text-primary transition-all hover:bg-primary/15 active:scale-95 shadow-2xs"
-                    >
-                      <Sparkles className="size-3 text-emerald-600" />
-                      <span>🔮 Predict 14-Day Outcome for this Crop</span>
-                    </button>
-                  </div>
-                )}
+                {/* 1-Click Prognosis Trigger on Bot messages with actual crop context */}
+                {m.role === "bot" &&
+                  !m.progression &&
+                  m.text &&
+                  hasCropContext(messages, m) && (
+                    <div className="flex pl-1">
+                      <button
+                        type="button"
+                        onClick={() => triggerForecast()}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/5 px-3 py-1 text-[11px] font-semibold text-primary transition-all hover:bg-primary/15 active:scale-95 shadow-2xs"
+                      >
+                        <Sparkles className="size-3 text-emerald-600" />
+                        <span>🔮 Predict 14-Day Outcome for this Crop</span>
+                      </button>
+                    </div>
+                  )}
               </div>
             ))}
 
