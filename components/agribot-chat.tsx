@@ -73,11 +73,14 @@ function hasCropContext(messages: Message[], currentMsg?: Message): boolean {
   return cropKeywords.some((k) => lower.includes(k))
 }
 
+const CACHE_KEY_PREFIX = "agribot_chat_cache_v2_"
+
 export function AgriBotChat({ onBack }: { onBack?: () => void }) {
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(false)
   const [forecastLoading, setForecastLoading] = useState(false)
   const [deviceInfo, setDeviceInfo] = useState<DeviceInfo | null>(null)
+  const [initialChecking, setInitialChecking] = useState(true)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   // Initialize and register device with MongoDB on mount
@@ -85,7 +88,21 @@ export function AgriBotChat({ onBack }: { onBack?: () => void }) {
     const info = getDeviceInfo()
     setDeviceInfo(info)
 
-    // Register device and load persistent history from MongoDB
+    // 1. FAST-PATH: Load cached messages immediately (0ms) so user never waits
+    try {
+      const cached = localStorage.getItem(CACHE_KEY_PREFIX + info.deviceId)
+      if (cached) {
+        const parsed = JSON.parse(cached)
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMessages(parsed)
+          setInitialChecking(false)
+        }
+      }
+    } catch (e) {
+      console.warn("Local cache read error:", e)
+    }
+
+    // 2. BACKGROUND SYNC: Register device and sync history from MongoDB
     fetch("/api/session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -96,12 +113,32 @@ export function AgriBotChat({ onBack }: { onBack?: () => void }) {
     })
       .then((res) => res.json())
       .then((data) => {
+        setInitialChecking(false)
         if (data?.history && Array.isArray(data.history) && data.history.length > 0) {
           setMessages(data.history)
+          try {
+            localStorage.setItem(CACHE_KEY_PREFIX + info.deviceId, JSON.stringify(data.history))
+          } catch (e) {}
         }
       })
-      .catch((err) => console.warn("Session init error:", err))
+      .catch((err) => {
+        console.warn("Session init error:", err)
+        setInitialChecking(false)
+      })
   }, [])
+
+  // Auto-persist messages locally so page reload is instantaneous
+  const updateMessages = (updater: (prev: Message[]) => Message[]) => {
+    setMessages((prev) => {
+      const next = updater(prev)
+      if (deviceInfo?.deviceId) {
+        try {
+          localStorage.setItem(CACHE_KEY_PREFIX + deviceInfo.deviceId, JSON.stringify(next))
+        } catch (e) {}
+      }
+      return next
+    })
+  }
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" })
@@ -139,7 +176,7 @@ export function AgriBotChat({ onBack }: { onBack?: () => void }) {
       const data = await res.json()
 
       setForecastLoading(false)
-      setMessages((prev) => [
+      updateMessages((prev) => [
         ...prev,
         {
           id: nextId(),
@@ -168,7 +205,7 @@ export function AgriBotChat({ onBack }: { onBack?: () => void }) {
     }
 
     const updatedMessages = [...messages, userMsg]
-    setMessages(updatedMessages)
+    updateMessages(() => updatedMessages)
     setLoading(true)
 
     try {
@@ -199,7 +236,7 @@ export function AgriBotChat({ onBack }: { onBack?: () => void }) {
       setLoading(false)
 
       // Add bot message that will stream incoming chunks
-      setMessages((prev) => [
+      updateMessages((prev) => [
         ...prev,
         {
           id: botMsgId,
@@ -216,7 +253,7 @@ export function AgriBotChat({ onBack }: { onBack?: () => void }) {
         const chunk = decoder.decode(value, { stream: true })
         accumulatedText += chunk
 
-        setMessages((prev) =>
+        updateMessages((prev) =>
           prev.map((msg) =>
             msg.id === botMsgId ? { ...msg, text: accumulatedText } : msg,
           ),
@@ -225,7 +262,7 @@ export function AgriBotChat({ onBack }: { onBack?: () => void }) {
     } catch (err: any) {
       console.error("Chat error:", err)
       setLoading(false)
-      setMessages((prev) => [
+      updateMessages((prev) => [
         ...prev,
         {
           id: nextId(),
@@ -258,6 +295,9 @@ export function AgriBotChat({ onBack }: { onBack?: () => void }) {
 
   async function resetChat() {
     if (deviceInfo?.deviceId) {
+      try {
+        localStorage.removeItem(CACHE_KEY_PREFIX + deviceInfo.deviceId)
+      } catch (e) {}
       fetch(`/api/session?deviceId=${deviceInfo.deviceId}`, {
         method: "DELETE",
       }).catch(() => {})
@@ -273,7 +313,14 @@ export function AgriBotChat({ onBack }: { onBack?: () => void }) {
       <div ref={scrollRef} className="relative flex-1 overflow-y-auto">
         <LeafBackdrop />
 
-        {isLanding ? (
+        {initialChecking && isLanding ? (
+          <div className="flex h-full items-center justify-center p-8">
+            <div className="flex flex-col items-center gap-2">
+              <div className="size-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              <p className="text-xs text-muted-foreground">Loading session...</p>
+            </div>
+          </div>
+        ) : isLanding ? (
           <ChatCenterHero
             onSend={(text, image) => sendMessage(text, image)}
             onSelectCategory={handleCategory}

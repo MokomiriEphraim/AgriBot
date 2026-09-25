@@ -37,10 +37,25 @@ export async function getMongoClient(): Promise<MongoClient | null> {
   }
 }
 
+let indexesCreated = false
+
 export async function getDatabase(dbName = "agribot_db"): Promise<Db | null> {
   const mongoClient = await getMongoClient()
   if (!mongoClient) return null
-  return mongoClient.db(dbName)
+  const db = mongoClient.db(dbName)
+
+  if (!indexesCreated) {
+    indexesCreated = true
+    // Create compound indexes in the background to make history queries ultra-fast
+    Promise.all([
+      db.collection("messages").createIndex({ deviceId: 1, createdAt: 1 }),
+      db.collection("devices").createIndex({ deviceId: 1 }, { unique: true }),
+      db.collection("forecasts").createIndex({ deviceId: 1, createdAt: -1 }),
+      db.collection("rate_limits").createIndex({ deviceId: 1, action: 1 }),
+    ]).catch((err) => console.warn("Index creation notice:", err))
+  }
+
+  return db
 }
 
 export interface DeviceRecord {

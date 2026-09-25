@@ -25,16 +25,16 @@ export async function POST(req: Request) {
     const ip = getClientIp(req)
     const userAgent = req.headers.get("user-agent") || "unknown"
 
-    // Register or update device metadata in MongoDB
-    await registerOrUpdateDevice({
-      deviceId,
-      ip,
-      userAgent,
-      hardwareInfo,
-    })
-
-    // Retrieve previous persistent conversation history for this device
-    const history = await getDeviceHistory(deviceId, 30)
+    // Retrieve previous persistent conversation history and register device concurrently
+    const [history] = await Promise.all([
+      getDeviceHistory(deviceId, 40),
+      registerOrUpdateDevice({
+        deviceId,
+        ip,
+        userAgent,
+        hardwareInfo,
+      }).catch((err) => console.warn("Background device register notice:", err)),
+    ])
 
     return NextResponse.json({
       success: true,
