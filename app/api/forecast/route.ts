@@ -4,7 +4,7 @@ import { getDatabase } from "@/lib/mongodb"
 import { checkRateLimit, recordUsage } from "@/lib/rate-limit"
 
 export const runtime = "nodejs"
-export const maxDuration = 60
+export const maxDuration = 120
 
 function createPlantVisualFallback(
   crop: string,
@@ -302,66 +302,46 @@ Reply ONLY as JSON:
 
         const treatedPrompt = `Photorealistic close-up photograph of a thriving, flourishing ${plantDesc}${colorNote}${leafNote} in peak health after 14 days of expert care — vibrant colors, fresh open blooms, pristine glossy foliage, bright natural morning sunlight. Clearly ${plantDetails.crop}. No text or badges.`
 
-        // Generate untreated (bad path) image
-        try {
-          const res1 = await openai.images.generate({
-            model: "dall-e-3",
-            prompt: untreatedPrompt,
-            n: 1,
-            size: "1024x1024",
-            quality: "standard",
-          })
-          if (res1.data?.[0]?.url) {
-            generatedUntreatedUrl = res1.data[0].url
-            imagesGenerated = true
-          }
-        } catch (e1: any) {
-          console.warn("DALL-E 3 untreated notice:", e1?.message || e1)
+        // Generate BOTH images in parallel using gpt-image-1 (base64 response)
+        const generateImage = async (prompt: string): Promise<string | null> => {
           try {
-            const res1Fallback = await openai.images.generate({
-              model: "dall-e-2",
-              prompt: untreatedPrompt.slice(0, 950),
+            const res = await openai.images.generate({
+              model: "gpt-image-1",
+              prompt: prompt,
               n: 1,
-              size: "512x512",
-            })
-            if (res1Fallback.data?.[0]?.url) {
-              generatedUntreatedUrl = res1Fallback.data[0].url
-              imagesGenerated = true
+              size: "1024x1024",
+            } as any)
+
+            // gpt-image-1 returns base64 data in b64_json field
+            const imageData = res.data?.[0]
+            if (imageData) {
+              // Handle both URL and base64 response formats
+              if ((imageData as any).b64_json) {
+                return `data:image/png;base64,${(imageData as any).b64_json}`
+              } else if (imageData.url) {
+                return imageData.url
+              }
             }
-          } catch (e1b: any) {
-            console.warn("DALL-E 2 untreated notice:", e1b?.message || e1b)
+            return null
+          } catch (err: any) {
+            console.warn("gpt-image-1 generation error:", err?.message || err)
+            return null
           }
         }
 
-        // Generate treated (good path) image
-        try {
-          const res2 = await openai.images.generate({
-            model: "dall-e-3",
-            prompt: treatedPrompt,
-            n: 1,
-            size: "1024x1024",
-            quality: "standard",
-          })
-          if (res2.data?.[0]?.url) {
-            generatedTreatedUrl = res2.data[0].url
-            imagesGenerated = true
-          }
-        } catch (e2: any) {
-          console.warn("DALL-E 3 treated notice:", e2?.message || e2)
-          try {
-            const res2Fallback = await openai.images.generate({
-              model: "dall-e-2",
-              prompt: treatedPrompt.slice(0, 950),
-              n: 1,
-              size: "512x512",
-            })
-            if (res2Fallback.data?.[0]?.url) {
-              generatedTreatedUrl = res2Fallback.data[0].url
-              imagesGenerated = true
-            }
-          } catch (e2b: any) {
-            console.warn("DALL-E 2 treated notice:", e2b?.message || e2b)
-          }
+        // Run both generations in parallel for speed
+        const [untreatedResult, treatedResult] = await Promise.allSettled([
+          generateImage(untreatedPrompt),
+          generateImage(treatedPrompt),
+        ])
+
+        if (untreatedResult.status === "fulfilled" && untreatedResult.value) {
+          generatedUntreatedUrl = untreatedResult.value
+          imagesGenerated = true
+        }
+        if (treatedResult.status === "fulfilled" && treatedResult.value) {
+          generatedTreatedUrl = treatedResult.value
+          imagesGenerated = true
         }
 
         if (imagesGenerated) {
