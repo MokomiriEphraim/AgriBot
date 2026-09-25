@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { AlertTriangle, CheckCircle2, Clock, Shield, Sparkles, TrendingDown, TrendingUp } from "lucide-react"
+import { AlertTriangle, CheckCircle2, Clock, Shield, Sparkles, TrendingDown, TrendingUp, Info } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export interface ProgressionData {
@@ -11,10 +11,14 @@ export interface ProgressionData {
   treatedUrl: string
   isHealthy?: boolean
   healthStatus?: string
+  causesBad?: string[]
+  causesGood?: string[]
   timeline?: {
     day3: string
     day7: string
     day14: string
+    day3Treated?: string
+    day7Treated?: string
     day14Treated: string
   }
   rateLimit?: {
@@ -37,17 +41,21 @@ export function CropProgressionCard({
   const [selectedDay, setSelectedDay] = useState<"day3" | "day7" | "day14">("day14")
 
   const isHealthy = data.isHealthy ?? false
-  const untreatedLabel = isHealthy ? "Neglected Path" : "Untreated Path (Loss)"
-  const treatedLabel = isHealthy ? "Well-Maintained" : "Treated Path (Recovery)"
-  const untreatedOutcome = isHealthy ? "Outcome: Plant Decline & Stress" : "Outcome: 100% Crop Loss"
-  const treatedOutcome = isHealthy ? "Outcome: Thriving & Healthy" : "Outcome: Full Harvest Recovery"
+  const untreatedLabel = isHealthy ? "Neglected Path (Risk)" : "Untreated Path (Loss)"
+  const treatedLabel = isHealthy ? "Maintained Care (Thriving)" : "Treated Path (Recovery)"
+  const untreatedOutcome = isHealthy ? "Outcome: Plant Decline & Dieback" : "Outcome: Severe Crop Loss"
+  const treatedOutcome = isHealthy ? "Outcome: Peak Vigor & Blooms" : "Outcome: Full Harvest Recovery"
 
   const timeline = data.timeline || {
-    day3: "Brown spots and fungal spores expand across adjoining leaves.",
-    day7: "Severe defoliation, blackening stems, flowers abort.",
-    day14: "Total canopy necrosis and rot — 100% crop lost.",
-    day14Treated: "Complete pathogen recovery, lush green foliage, thriving harvest.",
+    day3: `Early stress signs and petal wilting begin on ${data.crop}.`,
+    day7: `Significant leaf browning and flower head drooping.`,
+    day14: `Severe vascular collapse and defoliation on ${data.crop}.`,
+    day3Treated: `Immediate stabilization and fresh cell turgor for ${data.crop}.`,
+    day7Treated: `Robust new foliage growth and pristine bloom preservation.`,
+    day14Treated: `Peak agricultural vigor and abundant flowering.`,
   }
+
+  const causes = activeTab === "untreated" ? data.causesBad : data.causesGood
 
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-md">
@@ -62,14 +70,14 @@ export function CropProgressionCard({
               Crop Time-Machine Prognosis
             </h4>
             <p className="text-[11px] text-muted-foreground">
-              Visualizing the 14-day outcome for your {data.crop}
+              14-day dynamic outcome for your {data.crop}
             </p>
           </div>
         </div>
 
         <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-[10px] font-semibold text-primary">
           <Sparkles className="size-3" />
-          AI Forecast
+          AI Dual-Path
         </span>
       </div>
 
@@ -83,14 +91,15 @@ export function CropProgressionCard({
             </span>
           ) : (
             <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
-              ⚠️ Daily image limit reached — using stock photos
-              {data.rateLimit.resetAt && ` · Resets ${new Date(data.rateLimit.resetAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`}
+              ⚠️ Daily image limit reached — using smart visual models
+              {data.rateLimit.resetAt &&
+                ` · Resets ${new Date(data.rateLimit.resetAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`}
             </span>
           )}
         </div>
       )}
 
-      {/* View Switcher: Untreated vs Treated */}
+      {/* View Switcher: Untreated (Bad) vs Treated (Good) */}
       <div className="p-3 pb-0">
         <div className="grid grid-cols-2 gap-1.5 rounded-xl bg-muted/60 p-1">
           <button
@@ -124,12 +133,12 @@ export function CropProgressionCard({
       </div>
 
       {/* Main Image View */}
-      <div className="p-3">
+      <div className="p-3 space-y-3">
         <div className="relative aspect-4/3 w-full overflow-hidden rounded-xl border border-border bg-black/40">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={activeTab === "untreated" ? data.untreatedUrl : data.treatedUrl}
-            alt={activeTab === "untreated" ? "Untreated dying plant" : "Treated healthy plant"}
+            alt={activeTab === "untreated" ? "Untreated or neglected plant outcome" : "Treated or well-cared plant outcome"}
             className="size-full object-cover transition-all duration-500"
           />
 
@@ -145,63 +154,100 @@ export function CropProgressionCard({
                 {activeTab === "untreated" ? untreatedOutcome : treatedOutcome}
               </span>
             </div>
-            <span className="text-[10px] text-zinc-300 font-mono">Day 14</span>
+            <span className="text-[10px] text-zinc-300 font-mono">Day 14 Projection</span>
           </div>
         </div>
 
-        {/* Timeline Progression Details */}
-        <div className="mt-3 space-y-2 rounded-xl border border-border/70 bg-secondary/30 p-2.5 text-xs">
-          {activeTab === "untreated" ? (
-            <>
-              <div className="flex gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setSelectedDay("day3")}
-                  className={cn(
-                    "flex-1 rounded-md py-1 text-[11px] font-medium transition-all",
-                    selectedDay === "day3"
-                      ? "bg-red-500/20 text-red-600 dark:text-red-300 font-bold"
-                      : "text-muted-foreground hover:bg-muted",
-                  )}
-                >
-                  Day 3
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedDay("day7")}
-                  className={cn(
-                    "flex-1 rounded-md py-1 text-[11px] font-medium transition-all",
-                    selectedDay === "day7"
-                      ? "bg-red-500/20 text-red-600 dark:text-red-300 font-bold"
-                      : "text-muted-foreground hover:bg-muted",
-                  )}
-                >
-                  Day 7
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedDay("day14")}
-                  className={cn(
-                    "flex-1 rounded-md py-1 text-[11px] font-medium transition-all",
-                    selectedDay === "day14"
-                      ? "bg-red-500/20 text-red-600 dark:text-red-300 font-bold"
-                      : "text-muted-foreground hover:bg-muted",
-                  )}
-                >
-                  Day 14
-                </button>
-              </div>
-              <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+        {/* Why this happens (Root Causes / Action Drivers) */}
+        {causes && causes.length > 0 && (
+          <div
+            className={cn(
+              "rounded-xl border p-3 text-xs space-y-1.5",
+              activeTab === "untreated"
+                ? "border-red-500/20 bg-red-950/20 text-red-300"
+                : "border-emerald-500/20 bg-emerald-950/20 text-emerald-300",
+            )}
+          >
+            <div className="flex items-center gap-1.5 font-bold text-[11px] uppercase tracking-wider">
+              <Info className="size-3.5" />
+              <span>
+                {activeTab === "untreated"
+                  ? "What causes this decline:"
+                  : "What drives this thriving growth:"}
+              </span>
+            </div>
+            <ul className="space-y-1 pl-4 list-disc text-foreground/90">
+              {causes.map((cause, idx) => (
+                <li key={idx} className="leading-relaxed">
+                  {cause}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Day 3 / Day 7 / Day 14 Timeline Progression */}
+        <div className="space-y-2 rounded-xl border border-border/70 bg-secondary/30 p-2.5 text-xs">
+          <div className="flex gap-1.5">
+            <button
+              type="button"
+              onClick={() => setSelectedDay("day3")}
+              className={cn(
+                "flex-1 rounded-md py-1 text-[11px] font-medium transition-all",
+                selectedDay === "day3"
+                  ? activeTab === "untreated"
+                    ? "bg-red-500/20 text-red-600 dark:text-red-300 font-bold"
+                    : "bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 font-bold"
+                  : "text-muted-foreground hover:bg-muted",
+              )}
+            >
+              Day 3
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedDay("day7")}
+              className={cn(
+                "flex-1 rounded-md py-1 text-[11px] font-medium transition-all",
+                selectedDay === "day7"
+                  ? activeTab === "untreated"
+                    ? "bg-red-500/20 text-red-600 dark:text-red-300 font-bold"
+                    : "bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 font-bold"
+                  : "text-muted-foreground hover:bg-muted",
+              )}
+            >
+              Day 7
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedDay("day14")}
+              className={cn(
+                "flex-1 rounded-md py-1 text-[11px] font-medium transition-all",
+                selectedDay === "day14"
+                  ? activeTab === "untreated"
+                    ? "bg-red-500/20 text-red-600 dark:text-red-300 font-bold"
+                    : "bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 font-bold"
+                  : "text-muted-foreground hover:bg-muted",
+              )}
+            >
+              Day 14
+            </button>
+          </div>
+
+          <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+            {activeTab === "untreated" ? (
+              <>
                 {selectedDay === "day3" && `🚨 ${timeline.day3}`}
                 {selectedDay === "day7" && `⚠️ ${timeline.day7}`}
                 {selectedDay === "day14" && `❌ ${timeline.day14}`}
-              </p>
-            </>
-          ) : (
-            <p className="text-emerald-700 dark:text-emerald-300 text-xs leading-relaxed">
-              ✨ <strong>{isHealthy ? "14-Day Care Projection:" : "14-Day Treatment Effect:"}</strong> {timeline.day14Treated}
-            </p>
-          )}
+              </>
+            ) : (
+              <>
+                {selectedDay === "day3" && `🌱 ${timeline.day3Treated || timeline.day3}`}
+                {selectedDay === "day7" && `🌿 ${timeline.day7Treated || timeline.day7}`}
+                {selectedDay === "day14" && `✨ ${timeline.day14Treated}`}
+              </>
+            )}
+          </p>
         </div>
 
         {/* Action Prompt */}
@@ -209,10 +255,12 @@ export function CropProgressionCard({
           <button
             type="button"
             onClick={onApplyTreatment}
-            className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-xs font-semibold text-primary-foreground shadow-sm transition-transform hover:scale-[1.02] active:scale-[0.98]"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-xs font-semibold text-primary-foreground shadow-sm transition-transform hover:scale-[1.02] active:scale-[0.98]"
           >
             <CheckCircle2 className="size-4" />
-            {isHealthy ? "Show Best Care Tips to Keep This Plant Thriving" : "Show Step-by-Step Treatment to Save This Crop"}
+            {isHealthy
+              ? `Show Best Care Routine for ${data.crop}`
+              : `Show Step-by-Step Treatment to Save ${data.crop}`}
           </button>
         )}
       </div>
