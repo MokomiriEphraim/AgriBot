@@ -107,23 +107,30 @@ export function AgriBotChat({ onBack }: { onBack?: () => void }) {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" })
   }, [messages, loading, forecastLoading])
 
-  async function triggerForecast(customCrop?: string, customSymptom?: string) {
+  async function triggerForecast(customCrop?: string, customSymptom?: string, customMessages?: Message[]) {
     setForecastLoading(true)
 
+    const msgsToUse = customMessages || messages
+
+    // Find the last image in the conversation
+    const lastImageMsg = [...msgsToUse].reverse().find((m) => Boolean(m.image))
+    const lastImageUrl = lastImageMsg?.image
+
     // Compile recent chat context to extract crop and symptoms accurately
-    const chatContext = messages
-      .slice(-6)
-      .map((m) => `${m.role === "bot" ? "AgriBot" : "Farmer"}: ${m.text || "[uploaded photo]"}`)
-      .join("\n")
+    const chatContext = msgsToUse
+      .slice(-8)
+      .map((m) => `${m.role === "bot" ? "AgriBot" : "Farmer"}: ${m.text || "[uploaded plant photo]"}`)
+      .join("\n\n")
 
     try {
       const res = await fetch("/api/forecast", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          crop: customCrop || "Tomato",
-          symptom: customSymptom || "Crop condition",
+          crop: customCrop,
+          symptom: customSymptom,
           context: chatContext,
+          imageUrl: lastImageUrl,
           deviceId: deviceInfo?.deviceId,
         }),
       })
@@ -138,7 +145,7 @@ export function AgriBotChat({ onBack }: { onBack?: () => void }) {
           id: nextId(),
           role: "bot",
           time: now(),
-          text: `⏱️ **14-Day Visual Prognosis for ${data.crop} (${data.symptom}):**\nGenerated based on your conversation context:`,
+          text: `⏱️ **14-Day Visual Prognosis for ${data.crop} (${data.symptom}):**\nGenerated dynamically based on your plant's condition:`,
           progression: data,
         },
       ])
@@ -163,16 +170,6 @@ export function AgriBotChat({ onBack }: { onBack?: () => void }) {
     const updatedMessages = [...messages, userMsg]
     setMessages(updatedMessages)
     setLoading(true)
-
-    const shouldAutoForecast = Boolean(
-      image ||
-        trimmed.toLowerCase().includes("prognosis") ||
-        trimmed.toLowerCase().includes("predict") ||
-        trimmed.toLowerCase().includes("wait") ||
-        trimmed.toLowerCase().includes("untreated") ||
-        trimmed.toLowerCase().includes("blight") ||
-        trimmed.toLowerCase().includes("die"),
-    )
 
     try {
       const botMsgId = nextId()
@@ -224,13 +221,6 @@ export function AgriBotChat({ onBack }: { onBack?: () => void }) {
             msg.id === botMsgId ? { ...msg, text: accumulatedText } : msg,
           ),
         )
-      }
-
-      // If photo or disease was discussed, trigger context-aware prognosis
-      if (shouldAutoForecast) {
-        setTimeout(() => {
-          triggerForecast()
-        }, 700)
       }
     } catch (err: any) {
       console.error("Chat error:", err)
