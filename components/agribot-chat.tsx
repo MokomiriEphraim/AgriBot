@@ -9,6 +9,7 @@ import { CropProgressionCard, type ProgressionData } from "./crop-progression-ca
 import { LeafBackdrop } from "./leaf-backdrop"
 import { type MenuCategory } from "./quick-menu"
 import { TypingIndicator } from "./typing-indicator"
+import { ForecastProgress } from "./forecast-progress"
 import { getDeviceInfo, type DeviceInfo } from "@/lib/device"
 
 interface Message {
@@ -25,6 +26,26 @@ let idCounter = 0
 const nextId = () => `m${idCounter++}`
 const now = () =>
   new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+
+/**
+ * Pure greetings, in every language AgriBot supports. A greeting-only
+ * conversation must not reveal the 14-day button.
+ *
+ * Kept deliberately short and high-confidence: a false positive here silently
+ * hides a feature from a farmer who is genuinely asking about a crop. "we" and
+ * "bo" were both removed for exactly that reason — they are real English/common
+ * words that would swallow messages like "we need help with my tomatoes".
+ */
+const GREETING_PATTERN =
+  /^\s*(hi|hey|hello|yo|hoi|ahoy|howzit|habari|sawubona|shosha|ngubani|molo|mhloniphi|ndiyabulela|shono|thobela|bohloko|kia ora|ke a kgotso|goeie\s?(dag|môre|morgen|oggend)|groot\s?(dag|more)|dumela|ndoza|nkosi|kahle|mhlan|yebo|thata)\b/i
+
+/** A real greeting is short. Long text that merely opens with a marker is a question. */
+const GREETING_MAX_LENGTH = 40
+
+function isGreetingOnly(text: string): boolean {
+  const trimmed = text.trim()
+  return trimmed.length <= GREETING_MAX_LENGTH && GREETING_PATTERN.test(trimmed)
+}
 
 function hasCropContext(messages: Message[], currentMsg?: Message): boolean {
   // If an image was uploaded anywhere in the conversation
@@ -70,7 +91,22 @@ function hasCropContext(messages: Message[], currentMsg?: Message): boolean {
     "cassava",
   ]
 
-  return cropKeywords.some((k) => lower.includes(k))
+  if (cropKeywords.some((k) => lower.includes(k))) return true
+
+  // Language-neutral fallback. The keyword list above is English-only, so a
+  // farmer chatting in isiXhosa or isiZulu would otherwise never unlock the
+  // button. The system prompt requires the model to name the crop in English
+  // (brackets), so the list usually wins — this covers the rest, and guards
+  // against regressions in that prompt rule.
+  const userText = messages
+    .filter((m) => m.role === "user")
+    .map((m) => m.text || "")
+    .join(" ")
+
+  if (!userText.trim()) return false
+  if (isGreetingOnly(userText)) return false
+
+  return userText.trim().length > 12
 }
 
 const CACHE_KEY_PREFIX = "agribot_chat_cache_v2_"
@@ -79,6 +115,7 @@ export function AgriBotChat({ onBack }: { onBack?: () => void }) {
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(false)
   const [forecastLoading, setForecastLoading] = useState(false)
+  const [forecastApiDone, setForecastApiDone] = useState(false)
   const [deviceInfo, setDeviceInfo] = useState<DeviceInfo | null>(null)
   const [initialChecking, setInitialChecking] = useState(true)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -146,6 +183,7 @@ export function AgriBotChat({ onBack }: { onBack?: () => void }) {
 
   async function triggerForecast(customCrop?: string, customSymptom?: string, customMessages?: Message[]) {
     setForecastLoading(true)
+    setForecastApiDone(false)
 
     const msgsToUse = customMessages || messages
 
@@ -175,7 +213,14 @@ export function AgriBotChat({ onBack }: { onBack?: () => void }) {
       if (!res.ok) throw new Error("Failed to load forecast")
       const data = await res.json()
 
+      // Signal the progress bar that the API is done — it races to 99%
+      setForecastApiDone(true)
+
+      // Give the user ~800ms to see the 99% completion before swapping in the card
+      await new Promise((resolve) => setTimeout(resolve, 800))
+
       setForecastLoading(false)
+      setForecastApiDone(false)
       updateMessages((prev) => [
         ...prev,
         {
@@ -189,6 +234,7 @@ export function AgriBotChat({ onBack }: { onBack?: () => void }) {
     } catch (err) {
       console.error(err)
       setForecastLoading(false)
+      setForecastApiDone(false)
     }
   }
 
@@ -395,7 +441,8 @@ export function AgriBotChat({ onBack }: { onBack?: () => void }) {
               </div>
             ))}
 
-            {(loading || forecastLoading) && <TypingIndicator />}
+            {forecastLoading && <ForecastProgress apiDone={forecastApiDone} />}
+            {loading && !forecastLoading && <TypingIndicator />}
           </div>
         )}
       </div>

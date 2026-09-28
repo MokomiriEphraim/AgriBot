@@ -1,6 +1,7 @@
 import OpenAI from "openai"
 import { NextResponse } from "next/server"
 import { saveDeviceMessage } from "@/lib/mongodb"
+import { buildLanguageRule, detectConversationLanguage, detectLanguage, languageLabel, type SaLanguageCode } from "@/lib/language"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
@@ -32,6 +33,15 @@ const GROUNDBREAKING_AGRONOMY_PROMPT = `You are AgriBot — an elite, friendly A
    - Friendly, confident, and professional.
    - Use clean markdown with bold section headers and bullet points for easy reading on mobile in the field.
    - Build upon previous conversation context seamlessly.`
+
+/**
+ * The language-mirroring clause is appended per request because it carries the
+ * detected language of the latest message. See lib/language.ts.
+ */
+function buildSystemPrompt(recentUserTexts: string[]): string {
+  const hint = detectConversationLanguage(recentUserTexts)
+  return `${GROUNDBREAKING_AGRONOMY_PROMPT}\n\n${buildLanguageRule(hint)}`
+}
 
 function getClientIp(req: Request): string {
   const forwarded = req.headers.get("x-forwarded-for")
@@ -67,8 +77,12 @@ export async function POST(req: Request) {
     }
 
     if (!apiKey) {
-      // Intelligent fallback when API key is not yet set
-      const fallbackResponse = generateSmartFallback(userPrompt, Boolean(lastUserMessage?.image))
+      // Offline stub when no API key is set. See generateSmartFallback().
+      const fallbackResponse = generateSmartFallback(
+        userPrompt,
+        Boolean(lastUserMessage?.image),
+        detectLanguage(userPrompt),
+      )
 
       if (deviceId) {
         saveDeviceMessage({
@@ -102,6 +116,11 @@ export async function POST(req: Request) {
     const openai = new OpenAI({ apiKey })
 
     // Map messages with enhanced vision prompt instructions
+    const recentUserTexts: string[] = messages
+      .filter((m: any) => m.role === "user")
+      .map((m: any) => m.content || m.text || "")
+      .filter(Boolean)
+
     const formattedMessages = messages.map((m: any) => {
       const role = m.role === "bot" ? "assistant" : m.role
 
@@ -134,7 +153,7 @@ export async function POST(req: Request) {
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [
-        { role: "system", content: GROUNDBREAKING_AGRONOMY_PROMPT },
+        { role: "system", content: buildSystemPrompt(recentUserTexts) },
         ...formattedMessages,
       ],
       stream: true,
@@ -187,7 +206,27 @@ export async function POST(req: Request) {
   }
 }
 
-function generateSmartFallback(query: string, hasImage: boolean): string {
+/**
+ * Offline stub used only when OPENAI_API_KEY is missing.
+ *
+ * This is a developer stub, not the product. It is deliberately NOT translated
+ * into the South African languages: it contains real agronomy content
+ * (neem oil ratios, Acetamiprid, NPK dilutions) and hand-translating that into
+ * 11 languages would ship advice this codebase cannot verify. Language
+ * mirroring is the model's job (see buildLanguageRule) and only happens once an
+ * API key is present. The detected language is surfaced so a developer can
+ * confirm detectLanguage() is working while debugging a missing key.
+ */
+function generateSmartFallback(
+  query: string,
+  hasImage: boolean,
+  detected: SaLanguageCode = "en",
+): string {
+  const offlineBanner = `_🔌 Offline mode: no \`OPENAI_API_KEY\` set, so this is a canned stub and is NOT language-mirrored. Detected language: ${languageLabel(detected)}._`
+  return `${buildOfflineStub(query, hasImage)}\n\n---\n\n${offlineBanner}`
+}
+
+function buildOfflineStub(query: string, hasImage: boolean): string {
   const lower = query.toLowerCase().trim()
 
   // Casual greetings

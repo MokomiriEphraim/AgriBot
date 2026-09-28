@@ -2,6 +2,7 @@ import OpenAI from "openai"
 import { NextResponse } from "next/server"
 import { getDatabase } from "@/lib/mongodb"
 import { checkRateLimit, recordUsage } from "@/lib/rate-limit"
+import { buildForecastLanguageRule, detectConversationLanguage } from "@/lib/language"
 
 export const runtime = "nodejs"
 export const maxDuration = 120
@@ -87,6 +88,7 @@ export async function POST(req: Request) {
 
     if (apiKey) {
       const openai = new OpenAI({ apiKey })
+      const languageHint = detectConversationLanguage([context])
 
       if (imageUrl && typeof imageUrl === "string") {
         // Inspect the uploaded photo directly with GPT-4o Vision
@@ -98,6 +100,8 @@ export async function POST(req: Request) {
                 role: "system",
                 content: `You are an elite Agronomist and Plant Pathologist.
 Analyze the user's plant photo and chat context to produce a complete 14-day prognosis model covering BOTH the BAD (neglected/untreated) and GOOD (treated/cared) paths.
+
+${buildForecastLanguageRule(languageHint)}
 
 Reply ONLY as JSON with these fields:
 {
@@ -169,6 +173,8 @@ Reply ONLY as JSON with these fields:
               {
                 role: "system",
                 content: `You are an expert Agronomist. Extract the plant from the chat and build a 14-day dual prognosis (bad vs good path) with causes.
+
+${buildForecastLanguageRule(languageHint)}
 Reply ONLY as JSON:
 {
   "crop": "exact plant name (e.g. Protea, Tomato, Maize)",
