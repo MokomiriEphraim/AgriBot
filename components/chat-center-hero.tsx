@@ -98,7 +98,7 @@ export function ChatCenterHero({
   const canSubmit = Boolean(value.trim() || attachedImage)
 
   return (
-    <div className="flex min-h-full flex-col items-center justify-center px-4 py-8 text-center sm:px-6">
+    <div className="flex min-h-full flex-col items-center justify-center px-4 py-8 text-center sm:px-6 lg:px-10">
       {/* Bot Icon with glowing pulse ring */}
       <div className="relative mb-3">
         <div className="absolute -inset-2 rounded-full bg-primary/10 blur-md animate-pulse" />
@@ -108,15 +108,15 @@ export function ChatCenterHero({
       </div>
 
       {/* Main Headline */}
-      <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+      <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl lg:text-4xl">
         How can I help you today?
       </h1>
-      <p className="mt-1 max-w-xs text-xs font-medium text-muted-foreground sm:text-sm">
+      <p className="mt-1 max-w-xs text-xs font-medium text-muted-foreground sm:text-sm lg:max-w-lg lg:text-base">
         Ask any farming question or diagnose crop diseases instantly
       </p>
 
       {/* Center AI Input Card */}
-      <div className="mt-6 w-full max-w-md rounded-2xl border border-border bg-card p-3 shadow-md transition-all focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/20">
+      <div className="mt-6 w-full max-w-md rounded-2xl border border-border bg-card p-3 shadow-md transition-all focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/20 lg:max-w-2xl lg:p-4">
         {/* Attached Photo Thumbnail Preview */}
         {attachedImage && (
           <div className="mb-2 flex items-center justify-between rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-1.5 pl-2">
@@ -160,7 +160,7 @@ export function ChatCenterHero({
               ? "Add instructions or question for this image..."
               : "Send a message or describe what's wrong with your crop..."
           }
-          className="w-full resize-none bg-transparent px-1 pt-1 text-sm text-foreground outline-none placeholder:text-muted-foreground"
+          className="w-full resize-none bg-transparent px-1 pt-1 text-sm text-foreground outline-none placeholder:text-muted-foreground lg:text-base"
         />
 
         <div className="mt-2 flex items-center justify-between border-t border-border/50 pt-2">
@@ -222,7 +222,7 @@ export function ChatCenterHero({
       </div>
 
       {/* Suggestion Chips / Pills */}
-      <div className="mt-5 flex w-full max-w-md flex-wrap items-center justify-center gap-2">
+      <div className="mt-5 flex w-full max-w-md flex-wrap items-center justify-center gap-2 lg:max-w-3xl">
         {MENU_CATEGORIES.map((cat) => {
           const Icon = cat.icon
           return (

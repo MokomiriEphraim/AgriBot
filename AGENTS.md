@@ -59,8 +59,33 @@ Every OpenAI route pins `export const runtime = "nodejs"` — don't move these t
 
 - Tailwind v4 with **no `tailwind.config.js`**. Theme tokens are CSS-first in `app/globals.css` (`@theme inline` + `:root`/`.dark`). Dark mode is class-based via `@custom-variant dark (&:is(.dark *))`.
 - shadcn style is `base-nova`; add with `npx shadcn add <name>`. Only `components/ui/button.tsx` is vendored — don't assume other shadcn components exist. Aliases: `@/components`, `@/lib/utils`.
-- `images.unoptimized: true`, so plain `<img>` for user photos.
+- `images.unoptimized: true`, so plain `<img>` for user photos and `next/image` `sizes` hints have no effect.
 - Bot text renders through `ReactMarkdown` (`components/chat-message.tsx`). System prompts lean on markdown headers/bullets for on-phone readability, and emoji are load-bearing in `generateSmartFallback`.
+
+### The app is a phone app that grew a desktop layout
+
+The 440px phone frame in `app/page.tsx` is the primary product. Desktop is a `lg:` (1024px+) enhancement layered on top, and the `lg:` prefix is load-bearing — **anything without it changes the phone view.**
+
+- `app/page.tsx` frame: `max-w-[440px]` + `sm:max-h-[900px]` everywhere, relaxed only at `lg:max-w-none lg:max-h-none`.
+- `AgriBotChat`'s root is `flex-col` and becomes `lg:flex-row`. The desktop sidebar is `<aside className="hidden ... lg:flex">` — it lives inside `AgriBotChat` (not `page.tsx`) specifically so it can reach `resetChat` / `handleCategory` / `handleOther`. `hidden` below `lg` means zero mobile impact.
+- A `<div className="flex min-h-0 min-w-0 flex-1 flex-col">` wrapper holds the scroll area + input. It changes mobile DOM structure but is provably layout-identical (same flex basis, `h-full` parent) — don't "simplify" it away without re-verifying.
+- Message and input columns are `lg:max-w-3xl lg:mx-auto`. On ultrawide the chat is still capped at 768px so text lines stay readable.
+
+**Verify any styling change against both.** Capture geometry with headless Chrome + CDP and diff before/after:
+`google-chrome --headless --remote-debugging-port=9222` → drive `Runtime.evaluate` / `Emulation.setDeviceMetricsOverride`, walk the DOM recording `{tag, rect, display, flexDirection, maxWidth, fontSize}` per element. **Compare the multiset of those signatures, not DOM paths** — inserting a wrapper renumbers every path and will look like a total rewrite while the render is identical. Assert `documentElement.scrollWidth <= clientWidth` at 900 / 1024 / 1440 / 1920 / 2560 px.
+
+## Language support
+
+`lib/language.ts` is the single source of truth for the 11 written official SA languages (English, Afrikaans, isiNdebele, isiXhosa, isiZulu, Sepedi, Sesotho, siSwati, Setswana, isiXitsonga, Tshivenda). SASL is excluded — no written form.
+
+- **The model does the mirroring**, via `buildLanguageRule()` appended per-request in `/api/chat`. `detectLanguage()` is only a hint for short/ambiguous messages; never treat it as authoritative.
+- Marker threshold is 2 hits (`MIN_SCORE`) and falls back to `en`. Without it, English scores a structural zero and one ambiguous token drags a message into Afrikaans. English needs its own marker list for this reason.
+- `*` prefix on a marker = match as a **stem** (trailing boundary only). isiXhosa/isiZulu class prefixes mean "ithanga" also appears as "iithanga"; a leading word boundary rejects the stem entirely.
+- Tie-breaks are deterministic (marker-hit count → matched-character weight → code). Removing them makes results depend on object key order.
+- **The canonical-English-crop-name rule is load-bearing, not cosmetic.** `hasCropContext` only matches English keywords, so the prompt must force "ithanga (tomato)". In `/api/forecast` the same rule keeps `crop`/`visualDescription` English because they feed gpt-image-1 and the SVG — the model will otherwise return "iithanga" and degrade the artwork.
+- Phrase the forecast hint as a **default**, never an instruction. Stating "the farmer speaks English" as an instruction makes the model comply with a wrong guess and overrides the message it can plainly see.
+- The no-API-key fallback (`generateSmartFallback`) is deliberately **not** translated — it holds real dosing advice. Hand-translating 11 languages would ship content nobody can verify. It labels itself as a stub instead.
+
 
 ## Gotchas
 

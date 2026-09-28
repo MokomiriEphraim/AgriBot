@@ -1,15 +1,16 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { Sparkles } from "lucide-react"
+import { Camera, MessageCircleQuestion, Plus, Sparkles, Sprout } from "lucide-react"
 import { ChatInput } from "./chat-input"
 import { ChatMessage } from "./chat-message"
 import { ChatCenterHero } from "./chat-center-hero"
 import { CropProgressionCard, type ProgressionData } from "./crop-progression-card"
 import { LeafBackdrop } from "./leaf-backdrop"
-import { type MenuCategory } from "./quick-menu"
+import { MENU_CATEGORIES, type MenuCategory } from "./quick-menu"
 import { TypingIndicator } from "./typing-indicator"
 import { ForecastProgress } from "./forecast-progress"
+import { AgriBotIcon } from "./agribot-logo"
 import { getDeviceInfo, type DeviceInfo } from "@/lib/device"
 
 interface Message {
@@ -355,7 +356,83 @@ export function AgriBotChat({ onBack }: { onBack?: () => void }) {
   const isLanding = messages.length === 0
 
   return (
-    <div className="flex h-full flex-col bg-background">
+    <div className="flex h-full flex-col bg-background lg:flex-row">
+      {/* Desktop-only sidebar. `hidden` below lg keeps it out of the mobile
+          layout entirely, so the phone view is unaffected. */}
+      <aside className="hidden w-72 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground lg:flex">
+        <div className="flex items-center gap-3 px-5 py-5">
+          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-emerald-950 p-2 ring-1 ring-emerald-500/30">
+            <AgriBotIcon className="size-full" />
+          </span>
+          <div className="min-w-0">
+            <p className="truncate text-base font-bold text-sidebar-foreground">
+              AgriBot
+            </p>
+            <p className="truncate text-xs text-muted-foreground">
+              Crop health assistant
+            </p>
+          </div>
+        </div>
+
+        <div className="px-3">
+          <button
+            type="button"
+            onClick={resetChat}
+            disabled={isLanding}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-sidebar-primary px-3 py-2.5 text-sm font-semibold text-sidebar-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
+          >
+            <Plus className="size-4" />
+            New chat
+          </button>
+        </div>
+
+        <nav className="mt-6 min-h-0 flex-1 overflow-y-auto px-3">
+          <p className="px-2 pb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Ask about
+          </p>
+          <ul className="space-y-1">
+            {MENU_CATEGORIES.map((cat) => (
+              <li key={cat.id}>
+                <button
+                  type="button"
+                  onClick={() => handleCategory(cat)}
+                  className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                >
+                  <cat.icon className="size-4 shrink-0 text-accent" />
+                  <span className="truncate">{cat.label}</span>
+                </button>
+              </li>
+            ))}
+            <li>
+              <button
+                type="button"
+                onClick={handleOther}
+                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+              >
+                <MessageCircleQuestion className="size-4 shrink-0 text-accent" />
+                <span className="truncate">Other farming questions</span>
+              </button>
+            </li>
+          </ul>
+        </nav>
+
+        <div className="space-y-2.5 border-t border-sidebar-border px-5 py-4 text-xs text-muted-foreground">
+          <p className="flex items-center gap-2">
+            <Camera className="size-3.5 shrink-0 text-accent" />
+            Diagnose a crop from a photo
+          </p>
+          <p className="flex items-center gap-2">
+            <Sparkles className="size-3.5 shrink-0 text-accent" />
+            14-day untreated vs treated prognosis
+          </p>
+          <p className="flex items-center gap-2">
+            <Sprout className="size-3.5 shrink-0 text-accent" />
+            Replies in all 11 official SA languages
+          </p>
+        </div>
+      </aside>
+
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <div ref={scrollRef} className="relative flex-1 overflow-y-auto">
         <LeafBackdrop />
 
@@ -373,7 +450,7 @@ export function AgriBotChat({ onBack }: { onBack?: () => void }) {
             onOther={handleOther}
           />
         ) : (
-          <div className="relative space-y-4 px-3 py-6">
+          <div className="relative space-y-4 px-3 py-6 lg:mx-auto lg:w-full lg:max-w-3xl lg:px-6">
             <div className="flex items-center justify-between pb-2 border-b border-border/40">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -448,7 +525,7 @@ export function AgriBotChat({ onBack }: { onBack?: () => void }) {
       </div>
 
       {!isLanding && (
-        <div className="border-t border-border bg-background px-3 py-3">
+        <div className="border-t border-border bg-background px-3 py-3 lg:mx-auto lg:w-full lg:max-w-3xl lg:px-6">
           <ChatInput
             onSend={(text, image) => sendMessage(text, image)}
             placeholder="Ask AgriBot anything..."
@@ -456,6 +533,7 @@ export function AgriBotChat({ onBack }: { onBack?: () => void }) {
           />
         </div>
       )}
+      </div>
     </div>
   )
 }
